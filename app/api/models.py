@@ -63,6 +63,28 @@ class ChatRequest(BaseModel):
     )
 
 
+class ChatResponse(BaseModel):
+    """Response model for the chat endpoint."""
+    
+    content: str = Field(
+        ...,
+        description="The AI's response content"
+    )
+    model: str = Field(
+        ...,
+        description="The AI model that generated the response"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "content": "Hello! I'm doing well, thank you for asking. How can I help you today?",
+                "model": "gemini-2.0-flash"
+            }
+        }
+    )
+
+
 class HealthResponse(BaseModel):
     """Response model for the health check endpoint."""
     

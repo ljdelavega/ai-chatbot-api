@@ -5,9 +5,11 @@ This module defines the API routes for version 1 of the chat API.
 """
 
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.models import HealthResponse
+from app.api.models import HealthResponse, ChatRequest, ChatResponse
+from app.services.ai_factory import AIServiceFactory
+from app.services.ai_service import AIServiceError, AIProviderError, AIConfigurationError, AIRateLimitError
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -38,4 +40,78 @@ async def health_check() -> HealthResponse:
         status="healthy",
         timestamp=datetime.utcnow(),
         version="0.1.0"
-    ) 
+    )
+
+
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+    summary="Chat with AI",
+    description="Send a message to the AI and receive a response"
+)
+async def chat(request: ChatRequest) -> ChatResponse:
+    """
+    Chat endpoint that processes a conversation and returns an AI response.
+    
+    This endpoint accepts a list of messages representing the conversation history
+    and returns the AI's response. The endpoint requires authentication via X-API-Key header.
+    
+    Args:
+        request: ChatRequest containing the message history
+        
+    Returns:
+        ChatResponse: The AI's response to the conversation
+        
+    Raises:
+        HTTPException: Various error conditions with appropriate status codes
+    """
+    try:
+        logger.info(f"Processing chat request with {len(request.messages)} messages")
+        
+        # Get AI service from factory
+        ai_service = AIServiceFactory.get_default_service()
+        
+        # Process the chat request
+        response_content = await ai_service.chat(request.messages)
+        
+        logger.info("Chat request processed successfully")
+        
+        return ChatResponse(
+            content=response_content,
+            model=ai_service.model_name
+        )
+        
+    except AIRateLimitError as e:
+        logger.warning(f"Rate limit exceeded: {str(e)}")
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded: {str(e)}"
+        )
+        
+    except AIConfigurationError as e:
+        logger.error(f"AI service configuration error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="AI service configuration error"
+        )
+        
+    except AIProviderError as e:
+        logger.error(f"AI provider error: {str(e)}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI provider error: {str(e)}"
+        )
+        
+    except AIServiceError as e:
+        logger.error(f"AI service error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI service error: {str(e)}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in chat endpoint: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )

@@ -59,10 +59,19 @@ class TestGeminiService:
     def test_initialization_missing_api_key(self, mock_chat_client):
         """Test initialization failure with missing API key."""
         with patch('app.services.gemini_service.settings') as mock_settings:
-            mock_settings.model_api_key = "test-model-key"  # Default test key
+            mock_settings.model_api_key = None  # Actually missing API key
             
             with pytest.raises(AIConfigurationError, match="Gemini API key not configured"):
                 GeminiService()
+    
+    def test_initialization_test_mode(self, mock_chat_client):
+        """Test initialization success with test API key (test mode)."""
+        with patch('app.services.gemini_service.settings') as mock_settings:
+            mock_settings.model_api_key = "test-model-key"  # Test mode
+            
+            service = GeminiService()
+            assert service.model_name == "gemini-2.0-flash"
+            assert service.client is None  # Test mode uses no client
     
     def test_initialization_invalid_api_key(self, mock_chat_client):
         """Test initialization failure with invalid API key."""
@@ -185,10 +194,18 @@ class TestGeminiService:
     def test_validate_configuration_failure(self, mock_chat_client):
         """Test configuration validation failure."""
         with patch('app.services.gemini_service.settings') as mock_settings:
-            mock_settings.model_api_key = "test-model-key"  # Default test key
+            mock_settings.model_api_key = None  # Actually missing API key
             
             with pytest.raises(AIConfigurationError):
                 service = GeminiService()
+    
+    def test_validate_configuration_test_mode(self, mock_chat_client):
+        """Test configuration validation success in test mode."""
+        with patch('app.services.gemini_service.settings') as mock_settings:
+            mock_settings.model_api_key = "test-model-key"  # Test mode
+            
+            service = GeminiService()
+            assert service.validate_configuration() is True
     
     def test_get_model_info(self, mock_settings, mock_chat_client):
         """Test model information retrieval."""
