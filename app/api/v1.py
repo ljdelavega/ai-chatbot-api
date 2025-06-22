@@ -6,6 +6,7 @@ This module defines the API routes for version 1 of the chat API.
 
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.api.models import HealthResponse, ChatRequest, ChatResponse
 from app.services.ai_factory import AIServiceFactory
@@ -115,3 +116,69 @@ async def chat(request: ChatRequest) -> ChatResponse:
             status_code=500,
             detail="Internal server error"
         )
+
+
+@router.post(
+    "/chat/stream",
+    summary="Streaming Chat with AI",
+    description="Send a message to the AI and receive a streaming response"
+)
+async def chat_stream(request: ChatRequest):
+    """
+    Streaming chat endpoint that processes a conversation and returns a streaming AI response.
+    
+    This endpoint accepts a list of messages representing the conversation history
+    and returns the AI's response as a stream of text chunks. The endpoint requires 
+    authentication via X-API-Key header.
+    
+    Args:
+        request: ChatRequest containing the message history
+        
+    Returns:
+        StreamingResponse: Real-time streaming AI response
+        
+    Raises:
+        HTTPException: Various error conditions with appropriate status codes
+    """
+    async def generate_response():
+        try:
+            logger.info(f"Processing streaming chat request with {len(request.messages)} messages")
+            
+            # Get AI service from factory
+            ai_service = AIServiceFactory.get_default_service()
+            
+            # Stream the response
+            async for chunk in ai_service.chat_stream(request.messages):
+                yield f"data: {chunk}\n\n"
+            
+            logger.info("Streaming chat request completed successfully")
+            
+        except AIRateLimitError as e:
+            logger.warning(f"Rate limit exceeded during streaming: {str(e)}")
+            yield f"event: error\ndata: Rate limit exceeded: {str(e)}\n\n"
+            
+        except AIConfigurationError as e:
+            logger.error(f"AI service configuration error during streaming: {str(e)}")
+            yield f"event: error\ndata: AI service configuration error\n\n"
+            
+        except AIProviderError as e:
+            logger.error(f"AI provider error during streaming: {str(e)}")
+            yield f"event: error\ndata: AI provider error: {str(e)}\n\n"
+            
+        except AIServiceError as e:
+            logger.error(f"AI service error during streaming: {str(e)}")
+            yield f"event: error\ndata: AI service error: {str(e)}\n\n"
+            
+        except Exception as e:
+            logger.error(f"Unexpected error in streaming chat endpoint: {str(e)}")
+            yield f"event: error\ndata: Internal server error\n\n"
+    
+    return StreamingResponse(
+        generate_response(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )

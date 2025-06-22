@@ -1,281 +1,343 @@
-# Headless AI Chat API
+# AI Chatbot API
 
-A portable, model-agnostic backend service that simplifies adding powerful conversational AI features to any frontend application. Built with Python, FastAPI, and LangChain for maximum flexibility and performance.
+A production-ready, containerized AI chat API with streaming support. Built with FastAPI, LangChain, and Docker for maximum portability and performance.
 
-## 🌟 Overview
+## 🚀 Features
 
-This headless AI chat API solves the problem of high complexity and redundant effort involved in building and maintaining backend logic for AI-powered chat applications. It provides a single, consistent interface that abstracts away the intricacies of interacting with different AI models.
+- **Real-time Streaming**: Progressive response delivery
+- **Model Agnostic**: Support for Gemini, OpenAI, Anthropic (configurable)
+- **Production Ready**: Docker containerization, health checks, structured logging
+- **Developer Friendly**: Test mode, auto-generated docs, comprehensive error handling
+- **Cloud Portable**: Deploy anywhere - Vercel, AWS, Google Cloud, or any container platform
 
-### Key Benefits
+## ⚡ Quick Commands
 
-- **🔄 Model-Agnostic**: Switch between AI providers (Gemini, OpenAI, Anthropic) via simple configuration
-- **🚀 High Performance**: Streaming-first API with sub-500ms TTFB after warm start
-- **📦 Cloud-Agnostic**: Deploy anywhere - Vercel, AWS Lambda, Google Cloud Run, or any container platform
-- **🛡️ Production-Ready**: Built-in security, error handling, and auto-generated API documentation
-- **⚡ Developer-First**: Simple setup, clear documentation, and excellent DX
+```bash
+# Start everything (recommended)
+docker-compose up -d
 
-## 🏗️ Architecture
+# Test health
+curl http://localhost:8000/api/v1/health
 
-```mermaid
-graph TD
-    subgraph "Client's Environment"
-        A[Frontend Application]
-    end
+# Test chat
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-api-key" \
+  -d '{"messages":[{"role":"user","content":"Hello!"}]}'
 
-    subgraph "Cloud Provider (Vercel, AWS, etc.)"
-        subgraph "Docker Container"
-            B[FastAPI Application]
-            C[LangChain Service]
-            B -- Invokes --> C
-        end
-    end
-    
-    subgraph "External AI Services"
-        D[Google Gemini API]
-        E[OpenAI API]
-        F[Anthropic API]
-    end
-
-    A -- HTTPS API Request --> B
-    C -- Calls --> D
-    C -- Calls --> E
-    C -- Calls --> F
-    B -- HTTPS Streaming Response --> A
+# View docs (open in browser)
+# http://localhost:8000/docs
 ```
 
-## 🚀 Quick Start
+## 🏃 Quick Start
 
-### Prerequisites
+### Option 1: Docker Compose (Recommended)
 
-- **Python**: 3.11 or later
-- **Poetry**: For dependency management
-- **Docker & Docker Compose**: For containerization
-- **AI API Key**: Gemini, OpenAI, or Anthropic API key
+```bash
+# Clone and start
+git clone <repository-url>
+cd ai-chatbot-api
+docker-compose up -d
 
-### Local Development Setup
+# Test the API
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-api-key" \
+  -d '{"messages":[{"role":"user","content":"Hello!"}]}'
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd ai-chatbot-api
-   ```
+### Option 2: Local Development
 
-2. **Install dependencies**
-   ```bash
-   poetry install
-   ```
+```bash
+# Setup
+poetry install
+poetry run uvicorn app.main:app --reload
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+# Test
+curl http://localhost:8000/api/v1/health
+```
 
-4. **Run with Docker Compose**
-   ```bash
-   docker-compose up --build
-   ```
+### Option 3: Docker Container
 
-5. **Test the API**
-   ```bash
-   curl -X POST http://localhost:8000/api/v1/chat \
-     -H "Content-Type: application/json" \
-     -H "X-API-Key: your-api-key" \
-     -d '{
-       "messages": [
-         {"role": "user", "content": "Hello, how are you?"}
-       ]
-     }'
-   ```
+```bash
+# Build and run
+docker build -t ai-chatbot-api .
+docker run -p 8000:8000 ai-chatbot-api
 
-## 📋 Environment Configuration
+# Test
+curl http://localhost:8000/api/v1/health
+```
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `MODEL_PROVIDER` | AI provider (`gemini`, `openai`, `anthropic`) | Yes | `gemini` |
-| `MODEL_API_KEY` | API key for the chosen provider | Yes | - |
-| `API_KEY` | Static API key for endpoint protection | Yes | - |
-| `ALLOWED_ORIGINS` | CORS origins (comma-separated) | No | `*` |
-| `LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | No | `INFO` |
+## 📋 Environment Variables
 
-### Example `.env` file
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `API_KEY` | API key for authentication | `test-api-key` | ✅ |
+| `MODEL_PROVIDER` | AI provider (`gemini`) | `gemini` | ✅ |
+| `MODEL_API_KEY` | Provider API key | `test-model-key` | ✅ |
+| `ALLOWED_ORIGINS` | CORS origins (JSON array) | `["*"]` | No |
+| `LOG_LEVEL` | Logging level | `INFO` | No |
 
+**Example `.env`:**
 ```env
+API_KEY=your-secure-api-key
 MODEL_PROVIDER=gemini
-MODEL_API_KEY=your_gemini_api_key_here
-API_KEY=your_secure_api_key_here
-ALLOWED_ORIGINS=http://localhost:3000,https://yourdomain.com
+MODEL_API_KEY=your-gemini-api-key
+ALLOWED_ORIGINS=["http://localhost:3000"]
 LOG_LEVEL=INFO
 ```
 
-## 🔌 API Reference
+## 🔌 API Endpoints
 
-### Base URL
-- **Local**: `http://localhost:8000`
-- **Production**: `https://your-deployment-url.com`
-
-### Authentication
-All endpoints require an API key passed in the `X-API-Key` header.
-
-### Endpoints
-
-#### `POST /api/v1/chat`
-Primary streaming chat endpoint for conversations.
-
-**Request Headers:**
-```
-Content-Type: application/json
-X-API-Key: your-api-key
-```
-
-**Request Body:**
-```json
-{
-  "messages": [
-    {
-      "role": "system",
-      "content": "You are a helpful assistant."
-    },
-    {
-      "role": "user", 
-      "content": "Hello, how are you?"
-    }
-  ]
-}
-```
-
-**Response:**
-- **Content-Type**: `text/plain` (streaming)
-- **Status**: `200 OK` for successful requests
-- **Body**: Streamed plain text response from the AI model
-
-**Error Response:**
-```json
-{
-  "detail": "Error message description"
-}
-```
-
-#### `GET /api/v1/health`
+### `GET /api/v1/health`
 Health check endpoint.
 
+```bash
+curl http://localhost:8000/api/v1/health
+```
+
 **Response:**
 ```json
-{
-  "status": "healthy",
-  "timestamp": "2025-01-21T10:30:00Z"
-}
+{"status":"healthy","timestamp":"2025-06-22T05:05:17.602860","version":"0.1.0"}
 ```
 
-### Message Format
-
-Messages follow the standard chat format:
-
-```typescript
-interface Message {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
-
-interface ChatRequest {
-  messages: Message[];
-}
-```
-
-## 🐳 Docker Deployment
-
-### Build and Run Locally
+### `POST /api/v1/chat`
+Complete AI response.
 
 ```bash
-# Build the image
-docker build -t ai-chatbot-api .
-
-# Run the container
-docker run -p 8000:8080 \
-  -e MODEL_PROVIDER=gemini \
-  -e MODEL_API_KEY=your_api_key \
-  -e API_KEY=your_secure_key \
-  ai-chatbot-api
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-api-key" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "What is FastAPI?"}
+    ]
+  }'
 ```
 
-### Multi-stage Build
+**Response:**
+```json
+{"content":"Hello! This is a test response...","model":"gemini-2.0-flash"}
+```
 
-The included `Dockerfile` uses a multi-stage build to optimize image size and security:
+### `POST /api/v1/chat/stream`
+Streaming AI response.
 
-1. **Builder stage**: Installs Poetry and dependencies
-2. **Final stage**: Creates a minimal runtime image with only production dependencies
+```bash
+curl -X POST http://localhost:8000/api/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-api-key" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "Tell me a story"}
+    ]
+  }'
+```
 
+**Response:** Real-time streamed text chunks.
+
+### `GET /docs`
+Interactive API documentation (Swagger UI).
+
+```bash
+# Open in browser
+http://localhost:8000/docs
+```
 
 ## 🧪 Testing
 
-### Manual Testing with curl
+### Run Unit Tests
+```bash
+# All tests
+poetry run pytest
+
+# With coverage
+poetry run pytest --cov=app
+
+# Specific test file
+poetry run pytest tests/test_ai_services.py -v
+```
+
+### Manual Testing Commands
 
 ```bash
 # Health check
 curl http://localhost:8000/api/v1/health
 
-# Chat request
+# Chat (complete response)
 curl -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key" \
-  -d '{
-    "messages": [
-      {"role": "user", "content": "What is the capital of France?"}
-    ]
-  }'
+  -H "X-API-Key: test-api-key" \
+  -d '{"messages":[{"role":"user","content":"Hello!"}]}'
+
+# Chat (streaming response)
+curl -X POST http://localhost:8000/api/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: test-api-key" \
+  -d '{"messages":[{"role":"user","content":"Count to 5"}]}'
+
+# Test authentication (should return 401)
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Hello!"}]}'
 ```
 
-### Using the Interactive Documentation
+## 🐳 Docker Commands
 
-Once running, visit `http://localhost:8000/docs` to access the auto-generated Swagger UI documentation where you can test endpoints interactively.
+### Development with Docker Compose
+```bash
+# Start services
+docker-compose up -d
 
-## 📊 Performance & Monitoring
+# View logs
+docker-compose logs -f
 
-### Performance Targets
-- **TTFB**: < 500ms after warm start
-- **Availability**: 99.9% uptime target
-- **Scalability**: Horizontal scaling via stateless design
+# Stop services
+docker-compose down
 
-### Monitoring
-- Health check endpoint: `/api/v1/health`
-- Structured logging with configurable levels
-- Container-ready for integration with monitoring solutions
+# Rebuild and start
+docker-compose up --build -d
+```
 
-## 🔒 Security
+### Production Docker
+```bash
+# Build optimized image
+docker build -t ai-chatbot-api .
 
-- **HTTPS**: All communication encrypted end-to-end
-- **API Key Authentication**: Static key validation via `X-API-Key` header  
-- **CORS**: Configurable allowed origins
-- **Container Security**: Non-root user, minimal attack surface
+# Run with environment variables
+docker run -d -p 8000:8000 \
+  -e API_KEY=your-api-key \
+  -e MODEL_API_KEY=your-model-key \
+  --name ai-chatbot \
+  ai-chatbot-api
 
-## 🛠️ Development
+# Check container health
+docker ps
+docker logs ai-chatbot
 
-### Project Structure
+# Stop and remove container
+docker stop ai-chatbot
+docker rm ai-chatbot
+```
+
+## 🏗️ Project Structure
 
 ```
 ai-chatbot-api/
 ├── app/
-│   ├── api/           # API routing layer
-│   ├── services/      # Business logic (LangChain)
-│   ├── core/          # Configuration, core objects  
-│   └── main.py        # App entrypoint
-├── docs/              # Documentation
-├── tests/             # Test suite
-├── pyproject.toml     # Poetry configuration
-├── poetry.lock        # Locked dependencies
-├── Dockerfile         # Container definition
-└── docker-compose.yml # Local development
+│   ├── api/                    # API routing layer
+│   │   ├── auth.py            # Authentication middleware
+│   │   ├── models.py          # Pydantic models
+│   │   └── v1.py              # API endpoints
+│   ├── services/              # Business logic layer
+│   │   ├── ai_service.py      # Abstract AI interface
+│   │   ├── gemini_service.py  # Gemini implementation
+│   │   └── ai_factory.py      # Service factory
+│   ├── core/                  # Configuration and utilities
+│   │   ├── config.py          # Environment config
+│   │   └── logging.py         # Logging setup
+│   └── main.py               # FastAPI application
+├── tests/                     # Unit tests
+├── docs/                      # Documentation
+├── Dockerfile                 # Multi-stage container build
+├── docker-compose.yml         # Local development setup
+├── pyproject.toml            # Poetry configuration
+└── poetry.lock               # Locked dependencies
 ```
 
-### Code Standards
-- **Python**: Follow PEP 8 conventions
-- **Async/Await**: All I/O operations are asynchronous
-- **Type Hints**: Full type annotation coverage
-- **Error Handling**: Structured error responses with proper HTTP status codes
+## ⚡ Development Workflow
 
-## 🗺️ Roadmap
+### Local Development
+```bash
+# Install dependencies
+poetry install
+
+# Run with hot reload
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Run tests
+poetry run pytest
+
+# Format code
+poetry run black app tests
+
+# Type checking
+poetry run mypy app
+```
+
+### Docker Development
+```bash
+# Start development environment
+docker-compose up -d
+
+# Watch logs
+docker-compose logs -f ai-chatbot-api
+
+# Execute commands in container
+docker-compose exec ai-chatbot-api bash
+
+# Restart after code changes
+docker-compose restart ai-chatbot-api
+```
+
+## 🔒 Security Features
+
+- **API Key Authentication**: X-API-Key header validation
+- **CORS Protection**: Configurable allowed origins
+- **Input Validation**: Pydantic models with strict validation
+- **Container Security**: Non-root user, minimal attack surface
+- **Error Handling**: Structured errors without information leakage
+
+## 📊 Monitoring & Health
+
+### Health Checks
+```bash
+# Application health
+curl http://localhost:8000/api/v1/health
+
+# Docker container health
+docker ps  # Shows health status
+
+# Detailed container inspection
+docker inspect ai-chatbot-api | grep -A5 Health
+```
+
+### Logging
+- **Structured JSON logging** for production
+- **Configurable log levels** via `LOG_LEVEL`
+- **Request/response logging** with correlation IDs
+- **Error tracking** with stack traces
+
+## 🚀 Deployment
+
+### Cloud Platforms
+The API is containerized and can be deployed to:
+
+- **Vercel**: Container deployment support
+- **AWS Lambda**: Container image support
+- **Google Cloud Run**: Serverless containers
+- **Azure Container Instances**: Direct container deployment
+- **Any Kubernetes cluster**: Standard container workload
+
+### Environment Setup for Production
+```bash
+# Required environment variables
+export API_KEY="your-production-api-key"
+export MODEL_API_KEY="your-gemini-api-key"
+export MODEL_PROVIDER="gemini"
+export ALLOWED_ORIGINS='["https://yourdomain.com"]'
+export LOG_LEVEL="INFO"
+```
+
+## 📈 Performance
+
+- **Streaming Responses**: Real-time progressive delivery
+- **Async Architecture**: Non-blocking I/O operations
+- **Container Optimization**: Multi-stage builds for minimal size
+- **Health Monitoring**: Built-in health checks
+- **Horizontal Scaling**: Stateless design for cloud deployment
 
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
