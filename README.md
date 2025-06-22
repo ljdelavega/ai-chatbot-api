@@ -1,96 +1,281 @@
-# Template for new projects written in Cursor
+# Headless AI Chat API
 
-## BASIC SETUP
-This template provides a starting point for AI-assisted coding projects. 
+A portable, model-agnostic backend service that simplifies adding powerful conversational AI features to any frontend application. Built with Python, FastAPI, and LangChain for maximum flexibility and performance.
 
-To get started quickly, place the `.cursor/rules/` directory into your project root.
+## 🌟 Overview
 
-## Directory Structure
-Create this directory structure for the project:
+This headless AI chat API solves the problem of high complexity and redundant effort involved in building and maintaining backend logic for AI-powered chat applications. It provides a single, consistent interface that abstracts away the intricacies of interacting with different AI models.
 
-1. **`docs/`**
+### Key Benefits
 
-    ├── **`architecture_docs.md`**
+- **🔄 Model-Agnostic**: Switch between AI providers (Gemini, OpenAI, Anthropic) via simple configuration
+- **🚀 High Performance**: Streaming-first API with sub-500ms TTFB after warm start
+- **📦 Cloud-Agnostic**: Deploy anywhere - Vercel, AWS Lambda, Google Cloud Run, or any container platform
+- **🛡️ Production-Ready**: Built-in security, error handling, and auto-generated API documentation
+- **⚡ Developer-First**: Simple setup, clear documentation, and excellent DX
 
-    └── **`product_requirement_docs.md`**
+## 🏗️ Architecture
 
-2. **`tasks/`**
+```mermaid
+graph TD
+    subgraph "Client's Environment"
+        A[Frontend Application]
+    end
 
-    ├── **`active_context.md`**
+    subgraph "Cloud Provider (Vercel, AWS, etc.)"
+        subgraph "Docker Container"
+            B[FastAPI Application]
+            C[LangChain Service]
+            B -- Invokes --> C
+        end
+    end
+    
+    subgraph "External AI Services"
+        D[Google Gemini API]
+        E[OpenAI API]
+        F[Anthropic API]
+    end
 
-    └── **`tasks_plan.md`**
-3. **`src/`**
-4. **`test/`**
-5. **`utils/`**
-6. **`config/`**
-7. **`data/`**
+    A -- HTTPS API Request --> B
+    C -- Calls --> D
+    C -- Calls --> E
+    C -- Calls --> F
+    B -- HTTPS Streaming Response --> A
+```
 
-• <code>.cursor/rules/</code> – Custom rules for Cursor  
-• <code>docs/</code> – Project documentation, architecture, and reference materials  
-• <code>tasks/</code> – Task plans, active context, and general to-do items  
-• <code>src/</code> – Main source code  
-• <code>test/</code> – Testing suite  
-• <code>utils/</code> – Utility scripts or libraries  
-• <code>config/</code> – Configuration files  
-• <code>data/</code> – Data resources  
-• (and potentially more directories as the project grows)
+## 🚀 Quick Start
 
-## Rule Files and Key Concepts
+### Prerequisites
 
-This template is organized around a set of rule files and documentation that work together to guide the AI.
+- **Python**: 3.11 or later
+- **Poetry**: For dependency management
+- **Docker & Docker Compose**: For containerization
+- **AI API Key**: Gemini, OpenAI, or Anthropic API key
 
-### 1. Core Rule Files (`.cursor/rules/`)
-These files define the AI's behavior and workflows.
+### Local Development Setup
 
-*   **`plan.mdc`**: Defines a workflow for planning and architecture based on understanding requirements, formulating an optimal solution, and seeking user validation.
-*   **`implement.mdc`**: Provides a systematic protocol for writing code, including dependency analysis, planning, and iterative changes with testing.
-*   **`debug.mdc`**: Outlines a process for diagnosing and fixing persistent errors by gathering context, reasoning about causes, and verifying fixes.
-*   **`memory.mdc`**: Instructs the AI on how to use the project documentation as a persistent memory to maintain context across sessions.
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd ai-chatbot-api
+   ```
 
-### 2. Project Documentation as Memory (`docs/` & `tasks/`)
-The AI uses these files as its primary source of truth for the project's goals, status, and technical details.
+2. **Install dependencies**
+   ```bash
+   poetry install
+   ```
 
-*   **`docs/architecture_docs.md`**: The System Architecture and Technical Specifications Document. Outlines the system's design, components, data flow, technology stack, development environment, coding conventions, and technical constraints.
-*   **`docs/product_requirement_docs.md`**: The Product Requirements Document (PRD). Describes the product's purpose, features, users, and overall functionality.
-*   **`tasks/tasks_plan.md`**: The task backlog and project progress tracker.
-*   **`tasks/active_context.md`**: Captures the immediate focus of development, recent decisions, and next steps.
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
----
-## ADVANCED SETUP
-You can create Custom Modes in Cursor to slightly optimize token usage.
+4. **Run with Docker Compose**
+   ```bash
+   docker-compose up --build
+   ```
 
-## Cursor
-In the "Modes" section, go to "Add Custom Mode".
-![create](resources/images/create_mode.png)
+5. **Test the API**
+   ```bash
+   curl -X POST http://localhost:8000/api/v1/chat \
+     -H "Content-Type: application/json" \
+     -H "X-API-Key: your-api-key" \
+     -d '{
+       "messages": [
+         {"role": "user", "content": "Hello, how are you?"}
+       ]
+     }'
+   ```
 
-### Chat Mode
-This mode is for LLM calls only (similar to the "Ask" mode). It does not read or write files, or run commands.
+## 📋 Environment Configuration
 
-![chat](resources/images/chat.png)
-Fill as per the image.
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `MODEL_PROVIDER` | AI provider (`gemini`, `openai`, `anthropic`) | Yes | `gemini` |
+| `MODEL_API_KEY` | API key for the chosen provider | Yes | - |
+| `API_KEY` | Static API key for endpoint protection | Yes | - |
+| `ALLOWED_ORIGINS` | CORS origins (comma-separated) | No | `*` |
+| `LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | No | `INFO` |
 
-In **Advanced options**, in the box for custom instructions, paste:
+### Example `.env` file
 
->1. Ask for clarifications and in-depth follow-ups as much as possible.
->2. Break down the problem into key concepts and smaller sub-problems iteratively.
->3. Explore all possible directions.
->4. Use rigorous and deep reasoning.
->5. Be very detailed and analytical.
+```env
+MODEL_PROVIDER=gemini
+MODEL_API_KEY=your_gemini_api_key_here
+API_KEY=your_secure_api_key_here
+ALLOWED_ORIGINS=http://localhost:3000,https://yourdomain.com
+LOG_LEVEL=INFO
+```
 
-### Write Mode
-This mode has three capabilities: (a) Read, (b) Write, and (c) Run commands. It is similar to a leaner version of the Agent mode.
+## 🔌 API Reference
 
-![chat](resources/images/write.png)
-Fill as per the image.
+### Base URL
+- **Local**: `http://localhost:8000`
+- **Production**: `https://your-deployment-url.com`
 
-In **Advanced options**, in the box for custom instructions, paste:
->Create and edit files and directories.
+### Authentication
+All endpoints require an API key passed in the `X-API-Key` header.
 
-### MCP Mode
-This is the bare minimum system prompt for executing an MCP server.
+### Endpoints
 
-![chat](resources/images/mcp.png)
-Fill as per the image.
+#### `POST /api/v1/chat`
+Primary streaming chat endpoint for conversations.
 
-In **Advanced options**, in the box for custom instructions, paste:
->Run connected MCP servers. This is a dedicated mode for MCP; use other modes for reading, writing, and running commands.
+**Request Headers:**
+```
+Content-Type: application/json
+X-API-Key: your-api-key
+```
+
+**Request Body:**
+```json
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user", 
+      "content": "Hello, how are you?"
+    }
+  ]
+}
+```
+
+**Response:**
+- **Content-Type**: `text/plain` (streaming)
+- **Status**: `200 OK` for successful requests
+- **Body**: Streamed plain text response from the AI model
+
+**Error Response:**
+```json
+{
+  "detail": "Error message description"
+}
+```
+
+#### `GET /api/v1/health`
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-01-21T10:30:00Z"
+}
+```
+
+### Message Format
+
+Messages follow the standard chat format:
+
+```typescript
+interface Message {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface ChatRequest {
+  messages: Message[];
+}
+```
+
+## 🐳 Docker Deployment
+
+### Build and Run Locally
+
+```bash
+# Build the image
+docker build -t ai-chatbot-api .
+
+# Run the container
+docker run -p 8000:8080 \
+  -e MODEL_PROVIDER=gemini \
+  -e MODEL_API_KEY=your_api_key \
+  -e API_KEY=your_secure_key \
+  ai-chatbot-api
+```
+
+### Multi-stage Build
+
+The included `Dockerfile` uses a multi-stage build to optimize image size and security:
+
+1. **Builder stage**: Installs Poetry and dependencies
+2. **Final stage**: Creates a minimal runtime image with only production dependencies
+
+
+## 🧪 Testing
+
+### Manual Testing with curl
+
+```bash
+# Health check
+curl http://localhost:8000/api/v1/health
+
+# Chat request
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "What is the capital of France?"}
+    ]
+  }'
+```
+
+### Using the Interactive Documentation
+
+Once running, visit `http://localhost:8000/docs` to access the auto-generated Swagger UI documentation where you can test endpoints interactively.
+
+## 📊 Performance & Monitoring
+
+### Performance Targets
+- **TTFB**: < 500ms after warm start
+- **Availability**: 99.9% uptime target
+- **Scalability**: Horizontal scaling via stateless design
+
+### Monitoring
+- Health check endpoint: `/api/v1/health`
+- Structured logging with configurable levels
+- Container-ready for integration with monitoring solutions
+
+## 🔒 Security
+
+- **HTTPS**: All communication encrypted end-to-end
+- **API Key Authentication**: Static key validation via `X-API-Key` header  
+- **CORS**: Configurable allowed origins
+- **Container Security**: Non-root user, minimal attack surface
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+ai-chatbot-api/
+├── app/
+│   ├── api/           # API routing layer
+│   ├── services/      # Business logic (LangChain)
+│   ├── core/          # Configuration, core objects  
+│   └── main.py        # App entrypoint
+├── docs/              # Documentation
+├── tests/             # Test suite
+├── pyproject.toml     # Poetry configuration
+├── poetry.lock        # Locked dependencies
+├── Dockerfile         # Container definition
+└── docker-compose.yml # Local development
+```
+
+### Code Standards
+- **Python**: Follow PEP 8 conventions
+- **Async/Await**: All I/O operations are asynchronous
+- **Type Hints**: Full type annotation coverage
+- **Error Handling**: Structured error responses with proper HTTP status codes
+
+## 🗺️ Roadmap
+
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

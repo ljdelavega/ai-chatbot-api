@@ -1,169 +1,212 @@
-# System Architecture & Technical Specifications: [Project Name]
+# System Architecture & Technical Specifications: Headless AI Chat API
 
-**Author:** [Your Name]
-**Date:** 2025-01-01
+**Author:** Lester Dela Vega
+**Date:** 2025-06-21
 
----
+-----
 
-## 1. Architectural Drivers & Decisions (The "Why")
+## 1\. Architectural Drivers & Decisions (The "Why")
 
-This section covers the "why" behind the project, outlining the business goals, constraints, and major design choices that shape the system.
+This section covers the "why" behind the project, outlining the goals, constraints, and major design choices that shape the system.
 
 ### 1.1. Overview & Business Goals
-A brief, high-level summary of the system's purpose and the goals it aims to achieve.
-* *e.g., To create a simple website using Next.js and Tailwind CSS.*
+
+This document describes a headless, portable AI chat API service. The primary goal is to create a reusable, model-agnostic backend that simplifies adding powerful conversational AI features to any frontend application. It solves the problem of high complexity and redundant effort involved in building and maintaining backend logic for AI-powered chat. The target user is a developer who needs a reliable API to power their user-facing chat application.
 
 ### 1.2. Key Architectural Drivers
+
 #### Constraints
-* **Technical:** Must use open-source technologies and integrate with a headless CMS or a local markdown system.
-* **Budgetary:** Monthly hosting costs must remain under $20.
-* **Time:** A minimum viable product (MVP) must be deployable within 3 months.
+
+  * **Technical:** The service must be written in Python to leverage the mature `langchain.py` library and the broader AI/ML ecosystem. It must be containerized with Docker to ensure portability across different cloud environments.
+  * **Budgetary:** The architecture must be deployable on platforms with generous free tiers for serverless functions or containers.
+  * **Time:** The MVP must be achievable by a solo developer, emphasizing a simple, focused feature set.
 
 #### Non-Functional Requirements (NFRs)
-The qualities the system must possess.
-* **Performance:** Average API response time must be <200ms. Page loads should be interactive in <2 seconds.
-* **Scalability:** The system should handle 100 concurrent users, with a clear path to scale to 1,000.
-* **Availability:** Target 99.9% uptime.
-* **Security:** Authentication must use modern, secure practices (e.g., OAuth2 or JWTs).
+
+  * **Performance:** The API must be highly responsive. Time To First Byte (TTFB) for streamed responses should be under 500ms after a warm start.
+  * **Scalability:** The architecture must be stateless and designed to scale horizontally via serverless functions or container orchestration.
+  * **Availability:** Target 99.9% uptime, relying on the high availability of the underlying cloud provider's infrastructure.
+  * **Security:** API endpoints must be protected. Communication must be encrypted end-to-end with HTTPS. The service will be secured using a static API key validation mechanism.
 
 ### 1.3. Core Architectural Decisions
-* **Architectural Pattern:** A monolithic approach using Next.js, where the frontend client and backend API service are part of the same application. This simplifies development and deployment for a personal project.
-* **Data Storage:** A combination of a PostgreSQL database for structured relational data (users, comments) and the local filesystem for markdown-based content (blog posts, project descriptions).
-* **Rationale:** This hybrid approach leverages a relational database for transactional integrity while using a simple, version-controlled file system for content.
 
----
+  * **Architectural Pattern:** A **Headless API (Microservice)** pattern. The system is a standalone, backend-only service with no user interface. It is completely decoupled from any frontend client.
+  * **Technology Stack:** **Python with the FastAPI framework**. This was chosen for its high performance, native asynchronous support, excellent data validation with Pydantic, and automatic API documentation generation.
+  * **Data Storage:** The service is **Stateless**. For the MVP, it will not connect to a database. Conversation history is expected to be managed by the client application and sent with each API request.
+  * **Deployment Strategy:** **Containerization via Docker**. This is the core decision enabling portability. A single Docker image can be deployed consistently across various platforms, including Vercel, AWS Lambda (with container image support), Google Cloud Run, and others.
 
-## 2. High-Level System Design (The "What")
+-----
 
-This section provides a visual overview of the system's structure and key user workflows.
+## 2\. High-Level System Design (The "What")
+
+This section provides a visual overview of the system's structure and the primary data flow.
 
 ### 2.1. Architecture Diagram
-A high-level view of the system's structure, showing the major components and their interactions.
+
+This diagram shows the components of the headless system and its interactions with external services and clients.
 
 ```mermaid
 graph TD
-    subgraph "Browser"
-        A[User]
+    subgraph "Client's Environment"
+        A[Frontend Application]
     end
 
-    subgraph "Cloud Provider"
-        B[Next.js Web App]
-        C[API Routes]
-        D[PostgreSQL Database]
+    subgraph "Cloud Provider (Vercel, AWS, etc.)"
+        subgraph "Docker Container"
+            B[FastAPI Application]
+            C[LangChain Service]
+            B -- Invokes --> C
+        end
+    end
+    
+    subgraph "External AI Services"
+        D[Google Gemini API]
+        E[OpenAI API]
+        F[...]
     end
 
-    A -- HTTPS --> B
-    B -- Renders & Serves Pages --> A
-    B -- Calls API --> C
-    C -- Queries/Mutates Data --> D
+    A -- HTTPS API Request --> B
+    C -- Calls --> D
+    C -- Calls --> E
+    C -- Calls --> F
+    B -- HTTPS Streaming Response --> A
 ```
-*Diagram shows a user interacting with the Next.js application, which handles both web page rendering and API calls to the PostgreSQL database.*
 
-### 2.2. System Workflow Example: User Login
-This diagram illustrates the sequence of events for a critical user workflow.
+*Diagram shows a client application making a secure API call to the FastAPI application, which is running inside a Docker container. The FastAPI app uses a LangChain service to orchestrate calls to one or more external AI model providers, then streams the response back to the client.*
+
+### 2.2. System Workflow Example: Processing a Chat Request
+
+This diagram illustrates the sequence of events for the API's primary function.
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Browser
-    participant WebApp
-    participant API
-    participant Database
+    participant ClientApp as Client Application
+    participant FastAPI as Python API Endpoint
+    participant LangChain as LangChain Service
+    participant AIProvider as AI Model Provider
 
-    User->>Browser: Enters credentials and clicks 'Login'
-    Browser->>WebApp: POST /login with credentials
-    WebApp->>API: POST /api/auth/login with credentials
-    API->>Database: SELECT user FROM users WHERE email = ...
-    alt User exists and password matches
-        Database-->>API: User Record
-        API->>WebApp: Returns JWT/Session Token
-        WebApp-->>Browser: Sets HTTPOnly Cookie & Redirects to Dashboard
-        Browser-->>User: Displays Dashboard
-    else User not found or password incorrect
-        Database-->>API: Not Found / Null
-        API->>WebApp: Returns 401 Unauthorized
-        WebApp-->>Browser: Renders Login Page with Error
-        Browser-->>User: Displays Error Message
+    ClientApp->>FastAPI: POST /api/v1/chat with message history & API key
+    FastAPI->>FastAPI: Validate API Key & Request Body
+    alt Request is Valid
+        FastAPI->>LangChain: Invoke chat chain with messages
+        LangChain->>AIProvider: Send formatted prompt to LLM
+        AIProvider-->>LangChain: Begin streaming response
+        LangChain-->>FastAPI: Stream response back
+        FastAPI-->>ClientApp: Stream response back (200 OK)
+    else Request is Invalid
+        FastAPI-->>ClientApp: Return Error Response (e.g., 401/403 Unauthorized)
     end
 ```
-*Workflow demonstrates the steps involved from the user submitting credentials to either successfully logging in or receiving an error message.*
 
----
+*Workflow demonstrates how a request from a client is validated and then passed through the service layers to an external AI provider, with the response streamed back through the same layers.*
 
-## 3. Technology & Environment (The "With")
+-----
+
+## 3\. Technology & Environment (The "With")
 
 This section details the specific technologies used and how to set up a local development environment.
 
 ### 3.1. Development Environment Setup
-A guide to setting up a local development environment.
-* **Node.js:** `v20.x` or later
-* **pnpm:** `pnpm` is the required package manager.
-* **Docker & Docker Compose:** Required for running the database locally.
-* **Git:** For version control.
+
+  * **Python:** `v3.11` or later.
+  * **Dependency Management:** **Poetry** is required for managing dependencies and virtual environments. The setup process involves running `poetry install` to create a virtual environment and install all dependencies from the `poetry.lock` file.
+  * **Docker & Docker Compose:** Required for building the container and running the application locally in a consistent manner.
+  * **Git:** For version control.
 
 ### 3.2. Technology Stack
-The specific libraries, frameworks, and tools used in this project.
 
-| Category | Technology | Version | Rationale & Usage Notes |
-| :--- | :--- | :--- | :--- |
-| **Framework** | `Next.js` | `^14.1` | SSR support, App Router, Server Actions, API Routes. |
-| **Language** | `TypeScript` | `^5.3` | Provides type safety to reduce runtime errors. Strict mode enabled. |
-| **UI Library** | `React` | `^18.2` | Functional components with state management. |
-| **Styling** | `Tailwind CSS` | `^3.4` | Utility-first for rapid UI development. |
-| **Backend** | `Next.js (API Routes)` | `^14.1` | Provides serverless API endpoints colocated with the frontend. |
-| **Database** | `PostgreSQL` | `^16.1` | Robust, reliable, and excellent for relational data. |
-| **Hosting** | `Cloud Provider` | N/A | Any cloud provider of your choice. |
-| **Linting** | `ESLint` | `^8.5` | Enforces code quality and style. |
-| **Formatting** | `Prettier` | `^3.2` | Automatic code formatting. |
-| **Containerization** | `Docker` | N/A | For consistent local development environments. |
+| Category | Technology | Rationale & Usage Notes |
+| :--- | :--- | :--- |
+| **Language** | `Python` | Chosen for its unparalleled AI/ML ecosystem. |
+| **Web Framework** | `FastAPI` | High-performance, async-native framework for building APIs. |
+| **AI Orchestration**| `LangChain` | Core library for structuring prompts, managing chains, and interacting with LLMs. |
+| **Dependency Mgt.**| **Poetry**| Provides deterministic builds and unified dependency/environment management. |
+| **Data Validation** | `Pydantic` | Used for request/response validation and environment variable management. |
+| **Hosting** | `Cloud Agnostic`| Deployed as a container on any supporting platform. |
+| **Containerization**| `Docker` | Ensures portability and consistent deployments. |
 
----
+-----
 
-## 4. Detailed Technical Implementation (The "How")
+## 4\. Detailed Technical Implementation (The "How")
 
-This section provides granular details on implementation patterns, conventions, and constraints for developers.
+This section provides granular details for developers building the service.
 
 ### 4.1. Key Implementation Decisions
-Critical implementation-level decisions and their rationale.
-* **API Design:** The project uses **Next.js API Routes** to implement a **RESTful API**. This keeps the frontend and backend in a single codebase, simplifying development.
-* **Authentication:** Authentication is handled using **JWTs (JSON Web Tokens)** with an access token (short-lived, in memory) and a refresh token (long-lived, in a secure `HttpOnly` cookie). This provides a good balance of security and performance.
-* **Data Fetching:** Client-side data fetching uses **React Query (`@tanstack/react-query`)** for robust caching, background refetching, and request deduplication.
-* **State Management:** Global client-side state (e.g., UI theme) uses **Zustand** for its simplicity and minimal boilerplate.
+
+  * **API Design:** The API will follow RESTful principles. The primary endpoint, `POST /api/v1/chat`, will support streaming responses to provide a real-time experience.
+  * **Authentication:** A static API key passed in the `X-API-Key` custom header will be used to protect the API endpoints. A FastAPI middleware will validate this key on incoming requests.
+  * **Configuration:** The application will be configured entirely through environment variables (e.g., `MODEL_PROVIDER`, `OPENAI_API_KEY`, `ALLOWED_ORIGINS`). Pydantic's `BaseSettings` will be used for type-safe loading of these variables.
+  * **Asynchronous Processing:** All I/O-bound operations, especially the API calls to external AI providers, will be written using Python's `async/await` syntax to ensure the service remains non-blocking and efficient.
 
 ### 4.2. Design Patterns & Coding Conventions
-All code should adhere to the following patterns for consistency.
-* **Folder Structure:** A **feature-based** folder structure is used within the `src/` directory.
+
+  * **Folder Structure:** A layered architecture will be used to separate concerns. The project root will contain `pyproject.toml` and `poetry.lock` for dependency management.
     ```
-    /src
-    ├── /app
-    ├── /components  # Shared, reusable UI components
-    └── /features
-        └── /auth    # Authentication feature
-            ├── /components
-            └── /api     # API route handlers
+    /app
+        /api    # API routing layer
+        /services # Business logic (LangChain)
+        /core   # Configuration, core objects
+        main.py # App entrypoint
+    pyproject.toml
+    poetry.lock
+    Dockerfile
     ```
-* **Component Design:** Components should be small and focused. Where appropriate, the **Container/Presentational Pattern** is encouraged to separate logic from UI.
-* **Naming Conventions:**
-    * Components: `PascalCase` (e.g., `UserProfile.tsx`)
-    * Functions/Variables: `camelCase` (e.g., `getUserProfile`)
-    * Types/Interfaces: `PascalCase` (e.g., `type UserProfile`)
-* **Error Handling:**
-    * **API:** Use centralized middleware for catching errors and formatting consistent responses.
-    * **Client:** Use React's **Error Boundaries** to catch rendering errors and `try/catch` blocks in data-fetching functions.
+  * **Service Layer Pattern:** Business logic is isolated in service modules (e.g., `langchain_service.py`). The API router's only job is to handle HTTP requests/responses and call the service layer.
+  * **Naming Conventions:** Standard Python conventions will be used (`snake_case` for variables and functions, `PascalCase` for classes).
+  * **Error Handling:** FastAPI's exception handling system will be used to catch application-specific errors and automatically convert them into structured JSON error responses with appropriate HTTP status codes.
 
 ### 4.3. Technical Constraints
-Known limitations that developers must be aware of.
-* **Database:** The project is developed against **PostgreSQL**. While Prisma allows for swapping databases, custom SQL queries are written in PostgreSQL syntax.
-* **API Rate Limits:** Any third-party APIs used (e.g., GitHub) have rate limits. Code must handle potential `429 Too Many Requests` errors gracefully.
-* **Browser Support:** Officially supports the **last two major versions of Chrome, Firefox, and Safari**. Functionality on other browsers is not guaranteed.
-* **Performance Budget:** The initial JavaScript bundle size must not exceed **250kB (gzipped)**. Use `@next/bundle-analyzer` to monitor this.
 
----
+  * **Statelessness:** The API must be designed to be completely stateless to function correctly in a serverless/horizontally-scaled environment. The client is responsible for maintaining conversation history.
+  * **Cold Starts:** As a containerized serverless function, the API will be subject to cold starts. The Docker image size must be optimized to minimize this latency.
+  * **Third-Party Constraints:** The system's performance, cost, and rate limits are ultimately constrained by the limits of the underlying AI model provider being used (e.g., Gemini, OpenAI).
 
-## 5. Future Considerations
+### 4.4. Containerization Strategy (Docker)
 
-Next steps to improve documentation and architecture as the project grows.
+To ensure portability and create an optimized production image, a multi-stage `Dockerfile` will be used. This separates build-time dependencies from runtime dependencies, resulting in a smaller and more secure final image.
 
-* **Adopt ADRs (Architecture Decision Records):** For more complex projects, create a dedicated `docs/adr/` directory. Each significant decision gets its own timestamped markdown file (e.g., `001-use-postgresql-database.md`). This creates an invaluable historical log of the project's evolution.
-* **Explore the C4 Model:** The diagram above is a simplified C4 "Container" diagram. The C4 model (Context, Containers, Components, Code) provides a framework for visualizing software at different levels of detail.
-* **Integrate Infrastructure as Code (IaC):** Consider defining your infrastructure using tools like Terraform. This makes your hosting setup repeatable, version-controlled, and documented by default.
+```dockerfile
+# 1. Builder Stage: Install dependencies
+FROM python:3.11-slim as builder
+
+# Install Poetry
+RUN pip install poetry
+
+# Set up a non-root user
+RUN useradd --create-home appuser
+WORKDIR /home/appuser
+
+# Copy only the dependency files
+COPY pyproject.toml poetry.lock ./
+
+# Install only production dependencies into a virtual environment
+RUN poetry config virtualenvs.in-project true && \
+    poetry install --no-dev --no-root
+
+
+# 2. Final Stage: Create the runtime image
+FROM python:3.11-slim as final
+
+# Set up a non-root user
+RUN useradd --create-home appuser
+USER appuser
+WORKDIR /home/appuser
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /home/appuser/.venv ./.venv
+
+# Copy the application code
+COPY ./app ./app
+
+# Activate the virtual environment and set the command
+# This ensures that 'uvicorn' is run from within the venv
+CMD ["./.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+```
+
+-----
+
+## 5\. Future Considerations
+
+  * **Adopt ADRs (Architecture Decision Records):** As the project evolves, document significant architectural decisions in a dedicated `docs/adr/` directory to maintain a clear historical context for design choices.
+  * **Integrate Infrastructure as Code (IaC):** For repeatable and version-controlled deployments, especially on platforms like AWS, consider using a tool like Terraform or AWS CDK to define the required infrastructure as code.
+  * **Implement Distributed Tracing:** For better observability in a production environment, integrate a tracing library (e.g., OpenTelemetry) to monitor request latency across the service and its calls to external APIs.
