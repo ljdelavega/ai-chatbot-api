@@ -8,7 +8,7 @@ and structuring API outputs.
 from typing import List, Literal
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class Message(BaseModel):
@@ -25,13 +25,14 @@ class Message(BaseModel):
         description="The content of the message"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "role": "user",
                 "content": "Hello, how are you today?"
             }
         }
+    )
 
 
 class ChatRequest(BaseModel):
@@ -44,8 +45,8 @@ class ChatRequest(BaseModel):
         description="List of messages in the conversation history"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "messages": [
                     {
@@ -59,6 +60,7 @@ class ChatRequest(BaseModel):
                 ]
             }
         }
+    )
 
 
 class HealthResponse(BaseModel):
@@ -77,14 +79,15 @@ class HealthResponse(BaseModel):
         description="API version"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "status": "healthy",
                 "timestamp": "2025-01-21T10:30:00Z",
                 "version": "0.1.0"
             }
         }
+    )
 
 
 class ErrorResponse(BaseModel):
