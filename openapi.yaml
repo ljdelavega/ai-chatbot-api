@@ -1,0 +1,363 @@
+openapi: 3.0.3
+info:
+  title: AI Chatbot API
+  description: |
+    A headless AI Chat API that provides streaming and non-streaming chat functionality
+    with various AI providers. This API is designed to be consumed by frontend applications
+    like the embeddable AI Chatbot Widget (MFE).
+    
+    ## Authentication
+    All endpoints (except `/health`) require authentication via the `X-API-Key` header.
+    
+    ## Streaming
+    The `/chat/stream` endpoint provides real-time streaming responses using Server-Sent Events (SSE).
+    
+    ## Error Handling
+    The API provides comprehensive error handling with appropriate HTTP status codes
+    and detailed error messages.
+  version: 0.1.0
+  contact:
+    name: Lester Dela Vega
+    email: lester@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://api.chatbot.example.com
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /api/v1/health:
+    get:
+      summary: Health Check
+      description: |
+        Check the health status of the API service. This endpoint is excluded
+        from authentication and can be used for monitoring and load balancer health checks.
+      operationId: healthCheck
+      tags:
+        - Health
+      security: []  # No authentication required
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "healthy"
+                timestamp: "2025-01-21T10:30:00Z"
+                version: "0.1.0"
+
+  /api/v1/chat:
+    post:
+      summary: Chat with AI
+      description: |
+        Send a message to the AI and receive a complete response. This endpoint
+        processes the entire conversation history and returns the AI's response
+        as a single message.
+      operationId: chat
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            example:
+              messages:
+                - role: "system"
+                  content: "You are a helpful assistant."
+                - role: "user"
+                  content: "Hello, how are you?"
+      responses:
+        '200':
+          description: AI response generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              example:
+                content: "Hello! I'm doing well, thank you for asking. How can I help you today?"
+                model: "gemini-2.0-flash"
+        '400':
+          description: Invalid request format or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Invalid message format: content cannot be empty"
+        '401':
+          description: Missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "API key required. Please provide X-API-Key header."
+        '403':
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Invalid API key provided."
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "Rate limit exceeded: Too many requests"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "AI service error"
+        '502':
+          description: AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                detail: "AI provider error: Service temporarily unavailable"
+
+  /api/v1/chat/stream:
+    post:
+      summary: Streaming Chat with AI
+      description: |
+        Send a message to the AI and receive a streaming response using Server-Sent Events (SSE).
+        The response is streamed in real-time as the AI generates it, providing a better
+        user experience for longer responses.
+        
+        ## Response Format
+        The response uses Server-Sent Events format:
+        - Data chunks: `data: <text_chunk>\n\n`
+        - Errors: `event: error\ndata: <error_message>\n\n`
+        
+        ## Client Implementation
+        Use EventSource or fetch with streaming to consume the response:
+        ```javascript
+        const response = await fetch('/api/v1/chat/stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': 'your-api-key'
+          },
+          body: JSON.stringify(chatRequest)
+        });
+        
+        const reader = response.body.getReader();
+        // Process streaming chunks...
+        ```
+      operationId: chatStream
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            example:
+              messages:
+                - role: "system"
+                  content: "You are a helpful assistant."
+                - role: "user"
+                  content: "Explain how streaming responses work"
+      responses:
+        '200':
+          description: Streaming response initiated successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                format: binary
+                description: |
+                  Server-Sent Events stream containing AI response chunks.
+                  Format: `data: <chunk>\n\n` for content, `event: error\ndata: <message>\n\n` for errors.
+              example: |
+                data: Streaming responses work by
+                
+                data:  sending data in real-time
+                
+                data:  as it's generated, providing
+                
+                data:  a better user experience.
+                
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: "no-cache"
+              description: Prevents caching of streaming response
+            Connection:
+              schema:
+                type: string
+                example: "keep-alive"
+              description: Maintains persistent connection
+            X-Accel-Buffering:
+              schema:
+                type: string
+                example: "no"
+              description: Disables nginx buffering for real-time streaming
+        '400':
+          description: Invalid request format or validation error
+          content:
+            text/plain:
+              example: "event: error\ndata: Invalid message format: content cannot be empty\n\n"
+        '401':
+          description: Missing API key
+          content:
+            text/plain:
+              example: "event: error\ndata: API key required. Please provide X-API-Key header.\n\n"
+        '403':
+          description: Invalid API key
+          content:
+            text/plain:
+              example: "event: error\ndata: Invalid API key provided.\n\n"
+        '429':
+          description: Rate limit exceeded
+          content:
+            text/plain:
+              example: "event: error\ndata: Rate limit exceeded: Too many requests\n\n"
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              example: "event: error\ndata: Internal server error\n\n"
+        '502':
+          description: AI provider error
+          content:
+            text/plain:
+              example: "event: error\ndata: AI provider error: Service temporarily unavailable\n\n"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key for authentication. Obtain this from your API provider.
+        Include it in the `X-API-Key` header for all requests (except `/health`).
+
+  schemas:
+    Message:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: ["system", "user", "assistant"]
+          description: The role of the message sender
+          example: "user"
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: The content of the message
+          example: "Hello, how are you today?"
+      example:
+        role: "user"
+        content: "Hello, how are you today?"
+
+    ChatRequest:
+      type: object
+      required:
+        - messages
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+          minItems: 1
+          maxItems: 50
+          description: List of messages in the conversation history
+      example:
+        messages:
+          - role: "system"
+            content: "You are a helpful assistant."
+          - role: "user"
+            content: "Hello, how are you?"
+
+    ChatResponse:
+      type: object
+      required:
+        - content
+        - model
+      properties:
+        content:
+          type: string
+          description: The AI's response content
+          example: "Hello! I'm doing well, thank you for asking. How can I help you today?"
+        model:
+          type: string
+          description: The AI model that generated the response
+          example: "gemini-2.0-flash"
+      example:
+        content: "Hello! I'm doing well, thank you for asking. How can I help you today?"
+        model: "gemini-2.0-flash"
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - version
+      properties:
+        status:
+          type: string
+          description: Health status of the service
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          description: Current server timestamp in ISO 8601 format
+          example: "2025-01-21T10:30:00Z"
+        version:
+          type: string
+          description: API version
+          example: "0.1.0"
+      example:
+        status: "healthy"
+        timestamp: "2025-01-21T10:30:00Z"
+        version: "0.1.0"
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message describing what went wrong
+          example: "Invalid API key provided"
+      example:
+        detail: "Invalid API key provided"
+
+tags:
+  - name: Health
+    description: Health check and monitoring endpoints
+  - name: Chat
+    description: Chat functionality with AI models
+
+externalDocs:
+  description: Find more information about the AI Chatbot API
+  url: https://github.com/your-username/ai-chatbot-api 
