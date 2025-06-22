@@ -26,7 +26,7 @@ This document describes a headless, portable AI chat API service. The primary go
   * **Performance:** The API must be highly responsive. Time To First Byte (TTFB) for streamed responses should be under 500ms after a warm start.
   * **Scalability:** The architecture must be stateless and designed to scale horizontally via serverless functions or container orchestration.
   * **Availability:** Target 99.9% uptime, relying on the high availability of the underlying cloud provider's infrastructure.
-  * **Security:** API endpoints must be protected. Communication must be encrypted end-to-end with HTTPS. The service will be secured using a static API key validation mechanism.
+  * **Security:** API endpoints must be protected with proper authentication. Communication must be encrypted end-to-end with HTTPS. The service uses a static API key validation mechanism with proper error handling (401 for missing keys, 403 for invalid keys).
 
 ### 1.3. Core Architectural Decisions
 
@@ -81,20 +81,31 @@ This diagram illustrates the sequence of events for the API's primary function.
 ```mermaid
 sequenceDiagram
     participant ClientApp as Client Application
+    participant AuthMW as Authentication Layer
     participant FastAPI as Python API Endpoint
     participant LangChain as LangChain Service
     participant AIProvider as AI Model Provider
 
-    ClientApp->>FastAPI: POST /api/v1/chat with message history & API key
-    FastAPI->>FastAPI: Validate API Key & Request Body
-    alt Request is Valid
+    ClientApp->>AuthMW: POST /api/v1/chat with X-API-Key header
+    
+    alt API Key Missing
+        AuthMW-->>ClientApp: 401 Unauthorized
+    else API Key Invalid
+        AuthMW-->>ClientApp: 403 Forbidden
+    else API Key Valid
+        AuthMW->>FastAPI: Forward validated request
+        FastAPI->>FastAPI: Validate Request Body
         FastAPI->>LangChain: Invoke chat chain with messages
-        LangChain->>AIProvider: Send formatted prompt to LLM
-        AIProvider-->>LangChain: Begin streaming response
+        
+        alt Test Mode (MODEL_API_KEY=test-model-key)
+            LangChain->>LangChain: Return mock response
+        else Production Mode (Real API Key)
+            LangChain->>AIProvider: Send formatted prompt to LLM
+            AIProvider-->>LangChain: Begin streaming response
+        end
+        
         LangChain-->>FastAPI: Stream response back
         FastAPI-->>ClientApp: Stream response back (200 OK)
-    else Request is Invalid
-        FastAPI-->>ClientApp: Return Error Response (e.g., 401/403 Unauthorized)
     end
 ```
 
@@ -134,8 +145,13 @@ This section provides granular details for developers building the service.
 ### 4.1. Key Implementation Decisions
 
   * **API Design:** The API will follow RESTful principles. The primary endpoint, `POST /api/v1/chat`, will support streaming responses to provide a real-time experience.
-  * **Authentication:** A static API key passed in the `X-API-Key` custom header will be used to protect the API endpoints. A FastAPI middleware will validate this key on incoming requests.
-  * **Configuration:** The application will be configured entirely through environment variables (e.g., `MODEL_PROVIDER`, `OPENAI_API_KEY`, `ALLOWED_ORIGINS`). Pydantic's `BaseSettings` will be used for type-safe loading of these variables.
+  * **Authentication:** A static API key passed in the `X-API-Key` custom header protects the API endpoints. FastAPI dependency injection validates this key on incoming requests with proper error responses:
+    - **401 Unauthorized**: Missing API key
+    - **403 Forbidden**: Invalid API key  
+    - **200 Success**: Valid API key allows access to AI services
+  * **Configuration:** The application will be configured entirely through environment variables (e.g., `MODEL_PROVIDER`, `MODEL_API_KEY`, `ALLOWED_ORIGINS`). Pydantic's `BaseSettings` will be used for type-safe loading of these variables. The system supports two distinct modes:
+    - **Test Mode**: `MODEL_API_KEY=test-model-key` triggers mock responses for development
+    - **Production Mode**: Real Gemini API key enables actual AI responses
   * **Asynchronous Processing:** All I/O-bound operations, especially the API calls to external AI providers, will be written using Python's `async/await` syntax to ensure the service remains non-blocking and efficient.
 
 ### 4.2. Design Patterns & Coding Conventions

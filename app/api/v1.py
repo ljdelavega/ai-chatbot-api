@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.api.models import HealthResponse, ChatRequest, ChatResponse
+from app.api.auth import get_api_key
 from app.services.ai_factory import AIServiceFactory
 from app.services.ai_service import AIServiceError, AIProviderError, AIConfigurationError, AIRateLimitError
 from app.core.logging import get_logger
@@ -50,7 +51,7 @@ async def health_check() -> HealthResponse:
     summary="Chat with AI",
     description="Send a message to the AI and receive a response"
 )
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(request: ChatRequest, api_key: str = Depends(get_api_key)) -> ChatResponse:
     """
     Chat endpoint that processes a conversation and returns an AI response.
     
@@ -123,7 +124,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     summary="Streaming Chat with AI",
     description="Send a message to the AI and receive a streaming response"
 )
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, api_key: str = Depends(get_api_key)):
     """
     Streaming chat endpoint that processes a conversation and returns a streaming AI response.
     

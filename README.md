@@ -70,22 +70,35 @@ curl http://localhost:8000/api/v1/health
 
 ## 📋 Environment Variables
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `API_KEY` | API key for authentication | `test-api-key` | ✅ |
-| `MODEL_PROVIDER` | AI provider (`gemini`) | `gemini` | ✅ |
-| `MODEL_API_KEY` | Provider API key | `test-model-key` | ✅ |
-| `ALLOWED_ORIGINS` | CORS origins (JSON array) | `["*"]` | No |
-| `LOG_LEVEL` | Logging level | `INFO` | No |
+| Variable | Description | Default | Required | Notes |
+|----------|-------------|---------|----------|-------|
+| `API_KEY` | Client authentication key | `test-api-key` | ✅ | Used in X-API-Key header |
+| `MODEL_PROVIDER` | AI provider (`gemini`) | `gemini` | ✅ | Currently supports Gemini |
+| `MODEL_API_KEY` | Provider API key | `test-model-key` | ✅ | **Set to real key for production** |
+| `ALLOWED_ORIGINS` | CORS origins (JSON array) | `["*"]` | No | Restrict for production |
+| `LOG_LEVEL` | Logging level | `INFO` | No | DEBUG, INFO, WARNING, ERROR |
 
-**Example `.env`:**
+### 🔧 Configuration Modes
+
+#### Test Mode (Default)
 ```env
-API_KEY=your-secure-api-key
+API_KEY=test-api-key
+MODEL_API_KEY=test-model-key  # Triggers mock responses
+```
+
+#### Production Mode
+```env
+API_KEY=your_secure_api_key_here
+MODEL_API_KEY=your_actual_gemini_api_key  # Real Gemini API key
 MODEL_PROVIDER=gemini
-MODEL_API_KEY=your-gemini-api-key
-ALLOWED_ORIGINS=["http://localhost:3000"]
+ALLOWED_ORIGINS=["https://yourdomain.com"]
 LOG_LEVEL=INFO
 ```
+
+**⚠️ Important**: 
+- Set `MODEL_API_KEY` to your real Gemini API key to get actual AI responses
+- Use `test-model-key` for development/testing with mock responses
+- Always use a secure `API_KEY` in production (not `test-api-key`)
 
 ## 🔌 API Endpoints
 
@@ -161,25 +174,52 @@ poetry run pytest tests/test_ai_services.py -v
 ### Manual Testing Commands
 
 ```bash
-# Health check
+# Health check (no authentication required)
 curl http://localhost:8000/api/v1/health
 
-# Chat (complete response)
+# Chat with correct API key (should succeed)
 curl -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: test-api-key" \
+  -H "X-API-Key: your_secure_api_key_here" \
   -d '{"messages":[{"role":"user","content":"Hello!"}]}'
 
-# Chat (streaming response)
+# Chat streaming with correct API key
 curl -X POST http://localhost:8000/api/v1/chat/stream \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: test-api-key" \
+  -H "X-API-Key: your_secure_api_key_here" \
   -d '{"messages":[{"role":"user","content":"Count to 5"}]}'
 
-# Test authentication (should return 401)
+# Test authentication failures
+# Missing API key (should return 401)
 curl -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"messages":[{"role":"user","content":"Hello!"}]}'
+
+# Wrong API key (should return 403)
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: wrong-key" \
+  -d '{"messages":[{"role":"user","content":"Hello!"}]}'
+
+# Empty API key (should return 401)
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: " \
+  -d '{"messages":[{"role":"user","content":"Hello!"}]}'
+```
+
+### PowerShell Testing Commands
+
+```powershell
+# Test with correct API key
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/chat" -Method Post -Headers @{ "Content-Type" = "application/json"; "X-API-Key" = "your_secure_api_key_here" } -Body '{ "messages": [ { "role": "user", "content": "Hello!" } ] }'
+
+# Test authentication failures (use try-catch to handle errors)
+try {
+    Invoke-RestMethod -Uri "http://localhost:8000/api/v1/chat" -Method Post -Headers @{ "Content-Type" = "application/json"; "X-API-Key" = "wrong-key" } -Body '{ "messages": [ { "role": "user", "content": "test" } ] }'
+} catch {
+    Write-Host "Expected error: $($_.Exception.Message)"
+}
 ```
 
 ## 🐳 Docker Commands
@@ -282,11 +322,28 @@ docker-compose restart ai-chatbot-api
 
 ## 🔒 Security Features
 
-- **API Key Authentication**: X-API-Key header validation
+- **API Key Authentication**: X-API-Key header validation with proper error handling
+  - ✅ **401 Unauthorized**: Missing API key
+  - ✅ **403 Forbidden**: Invalid API key
+  - ✅ **200 Success**: Valid API key with real AI responses
 - **CORS Protection**: Configurable allowed origins
 - **Input Validation**: Pydantic models with strict validation
 - **Container Security**: Non-root user, minimal attack surface
 - **Error Handling**: Structured errors without information leakage
+- **Environment Separation**: Test mode vs Production mode with different API keys
+
+### 🔐 Authentication Flow
+
+1. **Client Request**: Must include `X-API-Key: your_secure_api_key_here` header
+2. **API Validation**: Compares against `API_KEY` environment variable
+3. **AI Service Access**: Only calls Gemini API with valid authentication
+4. **Error Responses**: Clear, structured error messages for debugging
+
+**Security Best Practices:**
+- Use strong, unique API keys in production
+- Restrict CORS origins to your domain
+- Monitor authentication failures in logs
+- Rotate API keys regularly
 
 ## 📊 Monitoring & Health
 

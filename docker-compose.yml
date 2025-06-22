@@ -7,28 +7,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - .env  # Load environment variables from .env file
     environment:
-      # API Configuration
-      - API_KEY=test-api-key
-      - MODEL_PROVIDER=gemini
-      - MODEL_API_KEY=test-model-key  # Use test mode by default
-      
-      # CORS Configuration
-      - ALLOWED_ORIGINS=["*"]
-      
-      # Logging Configuration
-      - LOG_LEVEL=INFO
-      
-      # Server Configuration
+      # Override defaults if needed
       - HOST=0.0.0.0
       - PORT=8000
-      
-      # Rate Limiting
-      - RATE_LIMIT_REQUESTS=100
-      
-      # Message Validation
-      - MAX_MESSAGE_LENGTH=10000
-      - MAX_HISTORY_LENGTH=50
     volumes:
       # Mount source code for development (optional)
       - ./app:/app/app:ro

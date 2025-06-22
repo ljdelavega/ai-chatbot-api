@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     model_config = SettingsConfigDict(
-        # env_file=".env",  # Temporarily disabled - .env format issues
+        env_file=".env",  # Load environment variables from .env file
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
